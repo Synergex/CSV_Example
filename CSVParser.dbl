@@ -1,0 +1,100 @@
+namespace CSVParser
+
+    class CSVFileParser
+    ;
+    ; Class to parse comma-separated variable-length files
+    ;
+        const D_PARSE_SIZE, int, 30     ;Size of parsing arrays
+        
+        private record
+            m_channel, int             ;Channel to read S_PARSE controls
+            m_start, int               ;starting location     
+            m_pos, [D_PARSE_SIZE]int   ;token position array
+            m_len, [D_PARSE_SIZE]int   ;token length array
+            m_typ, [D_PARSE_SIZE]int   ;token type array
+            m_nmitm, int               ;number of tokens parsed
+            m_ndx, int                 ;Index of current token
+            m_record, a1024            ;Data record
+            
+        public method CSVFileParser
+        ; Constructor
+            in req a_channel,  i            ;Channel to read
+        proc
+            m_channel = a_channel
+            clear m_nmitm, m_ndx, m_start   ;Prime for EOL
+        endmethod
+            
+        public method NextLine, int
+        ;
+        ; Read next line of input file and setup for parsing
+        ; Returns %true if we got a record, %false for EOF
+        ;
+        proc
+            try
+              reads(m_channel, m_record)
+            catch (e, @Synergex.synergyde.EndOfFileException)
+              begin
+                mreturn %false              ;End of file
+              end
+            endtry
+            m_start = 1                     ;Prime for parsing
+            clear m_nmitm, m_ndx
+            mreturn %true
+        endmethod
+        
+        public method NextWord, int
+        ;
+        ; Return the next comma-delimited item on the current line
+        ;
+            out req a_word, string          ;Returned item
+        ;        
+        ; Returns %true if we got one, %false for EOL
+        ;
+            record
+                token, string
+                type, int
+        proc
+            a_word = ""
+            if (NextToken(token, type))
+              begin
+                while (!((type == I_SPECIAL) && (token == ',')))
+                  begin
+                    a_word = a_word + token
+                    if (!NextToken(token, type))
+                      exitloop
+                  end
+                mreturn %true
+              end
+            mreturn %false
+        endmethod
+        
+        public method NextToken, int
+        ;
+        ; Return the next token on the current line
+        ;
+            out req a_token, string         ;Returned token
+            out req a_type, int             ;Returned token type
+        ;
+        ; Returns %true if we got one, %false for EOL
+        ;
+        proc
+            if (m_ndx >= m_nmitm)           ;Parse array exhausted?
+              begin
+                if (m_start) then           ;More to parse?
+                  begin
+                    s_parse(atrim(m_record), m_start, D_PARSE_SIZE, m_pos, m_len,
+                    & m_typ, m_nmitm, m_start)      ;Parse it
+                    if (m_nmitm == 0)
+                      mreturn %false        ;Nothing there
+                    clear m_ndx             ;Let's start at the very beginning
+                  end
+                else
+                  mreturn %false            ;No more to parse
+              end
+            incr m_ndx                      ;Next token
+            a_token = m_record(m_pos[m_ndx]:m_len[m_ndx])
+            a_type = m_typ[m_ndx]
+            mreturn %true
+        endmethod
+    endclass
+endnamespace

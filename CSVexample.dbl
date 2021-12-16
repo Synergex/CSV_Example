@@ -1,0 +1,23 @@
+import CSVParser
+    
+main test_parser
+;
+; Sample test program
+;
+record
+    parser, @CSVFileParser
+    word, string
+proc
+    open(1, o, "TT:")
+    open(2, i, 'csvfile.txt')
+    parser = new CSVFileParser(2)
+    while (parser.NextLine())
+      begin
+        writes(1, "Next line")
+        while (parser.NextWord(word))
+          begin
+            writes(1, "item = " + word)
+          end
+      end
+    close 1
+end
